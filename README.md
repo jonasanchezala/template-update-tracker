@@ -121,7 +121,9 @@ The principle is to **spend expensive reasoning where ambiguity is high, and sto
 
 **Where AI output was corrected or ignored**
 
-> **TODO (author):** add 2 or 3 concrete examples from the session history. Each example should say what the model proposed, why it was wrong, and what replaced it.
+- **Over-engineering.** The model tends to add features beyond the scope of the brief, and each one takes a lot of effort to build and review. I cut these back to what the requirements actually ask for.
+- **Too many infrastructure components.** It often recommends several services at once. Every extra component is another point of failure and more to maintain, so I looked for a balance and kept only what the requirements justify.
+- **Over-optimizing.** The model keeps finding something else to improve, so there is never a final result from it, and iterating with it could go on forever. I had to reconcile this myself: decide what is good enough, and stop when the requirements and acceptance criteria are met.
 
 **How I would guide other engineers using AI on this system**
 1. Don't let a model design against the raw brief. Write the requirements spec first and make it the model's contract.
@@ -129,6 +131,11 @@ The principle is to **spend expensive reasoning where ambiguity is high, and sto
 3. Require every AI-produced claim to trace to a requirement ID. Treat an untraceable claim as a defect.
 4. Write tests from the acceptance criteria before reading the generated code.
 5. Review every domain rule yourself. The costly bugs here are plausible-looking ones, such as a decline moving the baseline or a backfill overwriting live state.
+6. Share what works as reusable artifacts for the whole team, so good practice does not depend on one person's habits. These are skills for repeatable tasks, such as writing a spec from the brief or checking a design against requirement IDs, and agent instruction files (`AGENTS.md`, `CLAUDE.md`) that every session reads. Best practices for them:
+   - **Keep them short and specific.** State the rules the model gets wrong without being told, such as "don't add features or infrastructure that doesn't trace to a requirement ID", and link to the specs instead of copying them.
+   - **Treat them as code.** Keep them in the repository, review changes in pull requests, and update them when the system changes, because stale instructions mislead the model.
+   - **Add a rule when the model makes a mistake.** The guardrails above (requirement tags, traceability, tests from acceptance criteria) belong in these files.
+   - **Do not rely on them alone.** An instruction file lowers the chance of a mistake but does not prevent it, so reviews and tests still apply.
 
 **Where AI should not be trusted in this domain**
 - **Generating the change summaries that users read at runtime.** Auditors need summaries that are reproducible and traceable to the source. That is why the summaries are produced by deterministic rules, with an LLM used at most to help authors draft rule wording offline.
