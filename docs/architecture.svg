@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-label="Target architecture for Pending Template Update Tracking: template publish events fan out through SNS to a FIFO queue in each region; the Engagement Update Service holds all tenant data per region in DynamoDB; the global Template Change Service builds summaries on demand and caches them.">
+<style>
+svg{font-family:"IBM Plex Sans",Helvetica,Arial,sans-serif}
+.zone{fill:none;stroke:#c3cad1;stroke-width:1.5;stroke-dasharray:6 5}
+.zone-label{font:600 11px "IBM Plex Mono",Menlo,monospace;letter-spacing:.06em;fill:#59626d}
+.n rect{fill:#fff;stroke:#15191e;stroke-opacity:.55;stroke-width:1.2}
+.n.store rect{fill:#eceff2}
+.n.tenant rect{stroke:#a3480a;stroke-opacity:1;stroke-width:1.8}
+.n.key rect{stroke:#0d6b65;stroke-opacity:1;stroke-width:1.8;fill:#dcefed}
+.grp{fill:#fbeadc;fill-opacity:.45;stroke:#a3480a;stroke-width:1.8}
+.grp-label{font:600 12px "IBM Plex Sans Condensed",Arial,sans-serif;fill:#a3480a}
+.grp.plain{fill:#eceff2;fill-opacity:.5;stroke:#d3d9df;stroke-width:1.4}
+.grp-label.plain{fill:#59626d}
+.t{font-size:13px;font-weight:600;fill:#15191e}
+.s{font-size:11px;fill:#59626d;font-family:"IBM Plex Mono",Menlo,monospace}
+.edge{fill:none;stroke:#59626d;stroke-width:1.4}
+.edge.dash{stroke-dasharray:4 4}
+.edge.hot{stroke:#0d6b65;stroke-width:2}
+.el{font-size:11px;fill:#59626d;font-family:"IBM Plex Mono",Menlo,monospace}
+.el.hot{fill:#0d6b65;font-weight:500}
+</style>
+<defs>
+<marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#59626d"/></marker>
+<marker id="arh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#0d6b65"/></marker>
+</defs>
+<rect width="1280" height="720" fill="#ffffff"/>
+
+<!-- zones -->
+<rect class="zone" x="20" y="20" width="1240" height="200" rx="8"/>
+<text class="zone-label" x="1244" y="208" text-anchor="end">SHARED · NO TENANT DATA</text>
+<rect class="zone" x="20" y="260" width="1060" height="380" rx="8"/>
+<text class="zone-label" x="36" y="282">PER RESIDENCY REGION · TENANT DATA NEVER LEAVES</text>
+
+<!-- global -->
+<g class="n"><rect x="40" y="70" width="120" height="50" rx="4"/><text class="t" x="100" y="99" text-anchor="middle">Content teams</text></g>
+<rect class="grp plain" x="190" y="38" width="250" height="164" rx="6"/>
+<text class="grp-label plain" x="204" y="56">Template Service (existing + hook)</text>
+<g class="n"><rect x="210" y="70" width="210" height="50" rx="4"/><text class="t" x="315" y="92" text-anchor="middle">Template API</text><text class="s" x="315" y="109" text-anchor="middle">publish · read · diff</text></g>
+<g class="n store"><rect x="210" y="142" width="210" height="48" rx="4"/><text class="t" x="315" y="163" text-anchor="middle">Template DB</text><text class="s" x="315" y="180" text-anchor="middle">+ outbox table</text></g>
+<g class="n"><rect x="500" y="70" width="140" height="50" rx="4"/><text class="t" x="570" y="92" text-anchor="middle">SNS topic</text><text class="s" x="570" y="109" text-anchor="middle">fan-out to regions</text></g>
+<g class="n"><rect x="700" y="62" width="230" height="66" rx="4"/><text class="t" x="815" y="86" text-anchor="middle">Template Change Service</text><text class="s" x="815" y="103" text-anchor="middle">builds summaries on demand</text><text class="s" x="815" y="118" text-anchor="middle">global · no tenant data</text></g>
+<g class="n store"><rect x="980" y="62" width="250" height="66" rx="4"/><text class="t" x="1105" y="86" text-anchor="middle">DynamoDB summary cache</text><text class="s" x="1105" y="103" text-anchor="middle">key: template + version range</text><text class="s" x="1105" y="118" text-anchor="middle">+ S3 for large summaries</text></g>
+
+<path class="edge" d="M160 95H208" marker-end="url(#ar)"/>
+<path class="edge hot" d="M315 120V140" marker-end="url(#arh)"/><text class="el hot" x="325" y="134">one txn</text>
+<path class="edge hot" d="M420 95H498" marker-end="url(#arh)"/>
+<text class="el hot" x="470" y="64" text-anchor="middle">after commit</text>
+<path class="edge" d="M930 95H978" marker-end="url(#ar)"/>
+<path class="edge dash" d="M815 62V30H450V78H422" marker-end="url(#ar)"/>
+<text class="el" x="632" y="25" text-anchor="middle">get versions + diff (on first request)</text>
+
+<!-- SNS to region queue -->
+<path class="edge hot" d="M570 120V313" marker-end="url(#arh)"/>
+<text class="el hot" x="562" y="300" text-anchor="end">subscription per region</text>
+
+<!-- worker safety-net poll -->
+<path class="edge dash" d="M790 312V240H470V110H422" marker-end="url(#ar)"/>
+<text class="el" x="690" y="234" text-anchor="end">5-min poll</text>
+
+<!-- EMS -->
+<g class="n tenant"><rect x="40" y="315" width="210" height="56" rx="4"/><text class="t" x="145" y="338" text-anchor="middle">Engagement Mgmt (existing)</text><text class="s" x="145" y="356" text-anchor="middle">+ hooks · outbox per DB</text></g>
+<path class="edge" d="M250 343H498" marker-end="url(#ar)"/>
+<text class="el" x="374" y="334" text-anchor="middle">Created · Applied · Declined</text>
+<text class="el" x="374" y="361" text-anchor="middle">Archived · Loaded</text>
+
+<!-- regional queue -->
+<g class="n"><rect x="500" y="315" width="150" height="56" rx="4"/><text class="t" x="575" y="338" text-anchor="middle">SQS FIFO + DLQ</text><text class="s" x="575" y="356" text-anchor="middle">one per region</text></g>
+
+<!-- Engagement Update Service -->
+<rect class="grp" x="700" y="290" width="360" height="196" rx="6"/>
+<text class="grp-label" x="714" y="306">Engagement Update Service</text>
+<g class="n key"><rect x="715" y="312" width="150" height="64" rx="4"/><text class="t" x="790" y="333" text-anchor="middle">Engagement Update</text><text class="t" x="790" y="349" text-anchor="middle">Service-worker</text><text class="s" x="790" y="366" text-anchor="middle">cross-firm write</text></g>
+<g class="n"><rect x="715" y="404" width="150" height="64" rx="4"/><text class="t" x="790" y="425" text-anchor="middle">Engagement Update</text><text class="t" x="790" y="441" text-anchor="middle">Service-api</text><text class="s" x="790" y="458" text-anchor="middle">firm-scoped read</text></g>
+<g class="n store key"><rect x="890" y="312" width="155" height="120" rx="4"/><text class="t" x="967" y="334" text-anchor="middle">DynamoDB</text><text class="s" x="967" y="352" text-anchor="middle">PK = firm ID</text><text class="s" x="967" y="372" text-anchor="middle">engagement records</text><text class="s" x="967" y="387" text-anchor="middle">decisions</text><text class="s" x="967" y="402" text-anchor="middle">latest versions</text><text class="s" x="967" y="417" text-anchor="middle">impact counts</text></g>
+<path class="edge hot" d="M650 343H713" marker-end="url(#arh)"/>
+<path class="edge hot" d="M865 343H888" marker-end="url(#arh)"/>
+<path class="edge" d="M865 424L888 418" marker-end="url(#ar)"/>
+
+<!-- api to Template Change Service -->
+<path class="edge" d="M865 456H1070V200H900V130" marker-end="url(#ar)"/>
+<text class="el" x="1062" y="250" text-anchor="end">summary(tpl, from, to)</text>
+
+<!-- backfill -->
+<g class="n"><rect x="40" y="540" width="180" height="56" rx="4"/><text class="t" x="130" y="563" text-anchor="middle">Backfill</text><text class="s" x="130" y="581" text-anchor="middle">one-off · same image</text></g>
+<path class="edge dash" d="M130 540V373" marker-end="url(#ar)"/>
+<text class="el" x="122" y="460" text-anchor="end">throttled loads</text>
+<path class="edge dash" d="M220 568H967V434" marker-end="url(#ar)"/>
+<text class="el" x="590" y="560" text-anchor="middle">create record only if none exists · backfill.enabled</text>
+
+<!-- UI -->
+<g class="n"><rect x="1110" y="411" width="140" height="50" rx="4"/><text class="t" x="1180" y="440" text-anchor="middle">Web UI</text></g>
+<text class="el" x="1180" y="389" text-anchor="middle">API Gateway</text>
+<text class="el" x="1180" y="402" text-anchor="middle">+ authorizer</text>
+<path class="edge" d="M1110 436H867" marker-end="url(#ar)"/>
+<path class="edge" d="M1180 461V624H232V373" marker-end="url(#ar)"/>
+<text class="el" x="700" y="618" text-anchor="middle">apply / decline + reviewed version (409 if stale)</text>
+
+<!-- legend -->
+<g transform="translate(20,676)">
+<rect x="0" y="0" width="18" height="11" rx="2" fill="#fbeadc" stroke="#a3480a" stroke-width="1.8"/><text class="el" x="26" y="10">Owns or emits tenant data</text>
+<rect x="230" y="0" width="18" height="11" rx="2" fill="#dcefed" stroke="#0d6b65" stroke-width="1.8"/><text class="el" x="256" y="10">Publish path that gates visibility (SLO clock)</text>
+<rect x="580" y="0" width="18" height="11" rx="2" fill="none" stroke="#c3cad1" stroke-width="1.5" stroke-dasharray="4 3"/><text class="el" x="606" y="10">Global / regional boundary</text>
+<line x1="830" y1="6" x2="860" y2="6" class="edge dash"/><text class="el" x="868" y="10">Dashed = on-demand, background or one-off path</text>
+</g>
+</svg>
