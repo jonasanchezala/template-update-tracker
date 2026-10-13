@@ -59,7 +59,7 @@ cd engagement-update-core
 ./gradlew test
 ```
 
-This requires Java 21. The slice is plain Java with JUnit 5, AssertJ and jqwik. It uses no Spring and needs no AWS, because it proves the domain rules (sequence numbers, backfill precedence, the pending rule and impact counts) against in-memory stores that imitate DynamoDB's conditional writes.
+This requires Java 25. The slice is plain Java with JUnit 5 and AssertJ. It uses no Spring and needs no AWS, because it proves the domain rules (sequence numbers, backfill precedence, the pending rule and impact counts) against in-memory stores that imitate DynamoDB's conditional writes.
 
 ---
 
@@ -108,7 +108,6 @@ The principle is to **spend expensive reasoning where ambiguity is high, and sto
 | Every design element cites requirement IDs. | Design doc | Scope creep, meaning design with no requirement behind it, and gaps, meaning requirements with no design behind them. |
 | Rules are written as testable statements (R1 to R10) with acceptance criteria (AC-1 to AC-13). | Implementation spec | Vague behavior that code could "satisfy" in several different ways. |
 | Tests come from the acceptance criteria, **not from the generated code.** | Implementation spec §13 | Tests that simply confirm whatever the code happens to do. |
-| The property-based test's **oracle is written by hand** and reviewed separately. | Implementation spec §13 | An oracle that shares the implementation's bugs because both were generated together. |
 | Claims about cloud services are checked against AWS documentation. | Design review | Confident but wrong claims about service capabilities and limits. |
 
 ### Answers for the follow-up review
@@ -128,14 +127,14 @@ The principle is to **spend expensive reasoning where ambiguity is high, and sto
 1. Don't let a model design against the raw brief. Write the requirements spec first and make it the model's contract.
 2. Use strong models for the define, design and specify phases, and mid-tier models for building against a finished spec.
 3. Require every AI-produced claim to trace to a requirement ID. Treat an untraceable claim as a defect.
-4. Write tests from the acceptance criteria before reading the generated code, and write the test oracles by hand.
+4. Write tests from the acceptance criteria before reading the generated code.
 5. Review every domain rule yourself. The costly bugs here are plausible-looking ones, such as a decline moving the baseline or a backfill overwriting live state.
 
 **Where AI should not be trusted in this domain**
 - **Generating the change summaries that users read at runtime.** Auditors need summaries that are reproducible and traceable to the source. That is why the summaries are produced by deterministic rules, with an LLM used at most to help authors draft rule wording offline.
 - **Audit semantics.** Questions such as what a decline means, or what the summary baseline should be, are product decisions to record as assumptions, not details for a model to fill in.
 - **Tenant isolation and IAM policy.** These must be tested against real AWS. Model output and mocks are not evidence.
-- **Concurrency and ordering correctness.** Generated code that looks right under a single thread proves nothing. It needs property-based and concurrency tests.
+- **Concurrency and ordering correctness.** Generated code that looks right under a single thread proves nothing. It needs property-based and concurrency tests. The code slice does not have them yet: it proves the backfill rule on a single thread only, and its README lists this as a gap.
 - **Cloud service limits and capabilities.** Verify them against AWS documentation.
 
 ---

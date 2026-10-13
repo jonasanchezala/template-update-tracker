@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Draft v0.2 |
+| Status | Draft v0.3 |
 | Implements | Part of the Engagement Update Service, from `design-doc.md` v7 |
 | Requirements baseline | `requirements-spec.md` v0.3 |
 
@@ -27,7 +27,7 @@ Everything around the core, including queues, the database, the HTTP API, authen
 - The pending rule and the firm's engagement list.
 - The impact count per firm.
 - A storage interface whose operations mirror the conditional writes the real database will use, plus an in-memory implementation.
-- Unit tests, property-based tests, and a concurrency test for the backfill race.
+- Unit tests for every rule and acceptance criterion, and a table test for the pending rule.
 
 **Out of scope**, with where it lives in the design
 
@@ -164,7 +164,7 @@ interface LatestVersionStore {
 }
 ```
 
-The in-memory store must make `putIfAbsent` and `replaceIfSeqNewer` **atomic per engagement**, as the real database's conditional writes are. The concurrency test depends on this.
+The in-memory store must make `putIfAbsent` and `replaceIfSeqNewer` **atomic per engagement**, as the real database's conditional writes are. This is what keeps the backfill from beating a hook event under concurrency (FR-17).
 
 ## 8. Acceptance criteria
 
@@ -187,15 +187,15 @@ The in-memory store must make `putIfAbsent` and `replaceIfSeqNewer` **atomic per
 ## 9. Test plan
 
 - **Unit tests:** one test per acceptance criterion, AC-1 to AC-13.
-- **Property-based test (the central one).** Generate a random set of events for a few engagements and templates. Deliver them in a random order, with random duplicates. The final state must equal the state of a simple oracle that applies the same events once each, in sequence order. This one test covers R1 to R5 and R9 together.
-- **Concurrency test for the backfill race (FR-17).** Run the backfill seed and a hook event for the same engagement on two threads, many times, with the start order forced both ways. The hook's state must always survive.
 - **Pending table test.** A table of (applied, declined-through, latest, status) cases with the expected pending result, including the edges: equal versions, no declined version, unknown latest, and archived.
+
+**Not in this slice.** A property-based test (random order and duplicates against a hand-written oracle) and a concurrency test for the backfill race are left out. AC-7 and AC-8 prove the backfill rule on a single thread, and the store's atomic conditional writes are what make it safe under concurrency. The design's testing strategy (design §3) still calls for both against the real service.
 
 ## 10. Technology
 
-- **Java 21** with **Gradle**, matching the design's Spring Boot stack, but **without Spring** in this slice. The slice is pure domain logic, and a framework would add setup without proving anything.
-- **JUnit 5** and **AssertJ** for tests, and **jqwik** for property-based tests.
-- Records and sealed interfaces for events and value types.
+- **Java 25** with **Gradle**, matching the design's Spring Boot stack, but **without Spring** in this slice. The slice is pure domain logic, and a framework would add setup without proving anything.
+- **JUnit 5** and **AssertJ** for tests.
+- Records for events and value types. The event interface is not sealed, so the handler's `switch` expressions end in a `default` that throws.
 
 Suggested layout:
 
@@ -205,40 +205,34 @@ engagement-update-core/
   src/main/java/.../events/      event contracts
   src/main/java/.../handlers/    event handler, version handler, seeder, impact counter, query
   src/main/java/.../store/       store interfaces + in-memory implementations
-  src/test/java/...              unit, property-based, and concurrency tests
+  src/test/java/...              unit and table tests
   README.md                      how to run, and which spec rule each test proves
 ```
 
 ## 11. Implementation plan
 
-The slice is built in nine steps. Each step writes its acceptance tests **first**, from §8, then the code that makes them pass, so every step ends green.
+The slice is built in eight steps. Each step writes its acceptance tests **first**, from §8, then the code that makes them pass, so every step ends green.
 
 | Step | What | Rules and tests |
 |---|---|---|
-| 1 | **Project skeleton.** Gradle, Java 21, JUnit 5, AssertJ, jqwik. One empty test passes. | — |
-| 2 | **Domain model and event contracts.** Value types, `EngagementRecord`, `DecisionRecord`, `EngagementView`, the sealed `EngagementEvent` family, `TemplateVersionPublished`, `BackfillSnapshot`, and the outcome enums. | §4, §5 |
+| 1 | **Project skeleton.** Gradle, Java 25, JUnit 5, AssertJ. One empty test passes. | — |
+| 2 | **Domain model and event contracts.** Value types, `EngagementRecord`, `DecisionRecord`, `EngagementView`, the `EngagementEvent` family, `TemplateVersionPublished`, `BackfillSnapshot`, and the outcome enums. | §4, §5 |
 | 3 | **Store interfaces and in-memory stores.** `putIfAbsent` and `replaceIfSeqNewer` are atomic per engagement, using `ConcurrentHashMap.compute`, so they behave like DynamoDB's conditional writes. | §7 |
 | 4 | **Pending rule.** A pure function, tested first with the pending table test. | R7; pending table test |
 | 5 | **Engagement event handler.** Create, apply, decline, archive, the sequence-number check, the unknown-engagement cases, and decision history. | R1–R4a, R9; AC-1 to AC-6, AC-13 |
 | 6 | **Template version handler and backfill seeder.** | R5, R6; AC-7 to AC-9 |
 | 7 | **Firm query and impact counter.** User-facing reads take a firm; the impact count includes firms with zero. | R8, R10; AC-10 to AC-12 |
-| 8 | **Property-based test.** Write the oracle by hand first, then the event generator with random order and duplicates. | R1–R5, R9 together |
-| 9 | **Concurrency test and README.** The backfill race on two threads, both start orders. The README maps each test to its rule. | FR-17; §9 |
+| 8 | **README.** It maps each test to its rule and lists what is not tested. | §9, §12 |
 
-**If the slice has to be cut.** Steps 1 to 7 are the minimum deliverable: every rule implemented, with every acceptance test passing. After that, cut in this order:
+**If the slice has to be cut.** Steps 1 to 7 are the minimum deliverable: every rule implemented, with every acceptance test passing. After that, trim the README to a short rule-to-test table.
 
-1. Trim the README to a short rule-to-test table.
-2. Drop the concurrency test and note it as a gap. AC-7 still proves the rule on a single thread, and the store's atomic writes are what make it safe under concurrency.
-3. Narrow the property-based test to a single engagement and template. It still proves ordering and duplicates, which is its main value.
-
-Never cut: an acceptance test, or the hand-written oracle.
+Never cut: an acceptance test.
 
 ## 12. Definition of done
 
 - Every rule R1 to R10 is implemented, and every acceptance criterion AC-1 to AC-13 has a passing test.
-- The property-based test and the concurrency test pass reliably over repeated runs.
 - `./gradlew test` passes from a clean checkout.
-- The README maps each test to the rule it proves.
+- The README maps each test to the rule it proves, and lists what is not tested.
 - Nothing outside §2 "In scope" is built.
 
 ## 13. Working with AI on this slice
@@ -247,4 +241,3 @@ This spec is the contract. AI tools may generate code and tests from it, but:
 
 - **Every rule in §6 is checked by a human** against the design before code exists. Rules are where a plausible-looking mistake does real damage. Examples: letting a decline move the baseline, or letting the backfill overwrite an existing record.
 - **Tests are written from the acceptance criteria, not from the generated code**, so a test can't simply confirm whatever the code happens to do.
-- **The oracle in the property-based test is written by hand**, kept deliberately simple, and reviewed separately. If the oracle were generated alongside the implementation, it could share the implementation's bugs.
